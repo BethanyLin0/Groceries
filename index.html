@@ -739,9 +739,9 @@
     claimed.forEach(it=>{
       const share = Number(it.price) / it.customers.length;
       it.customers.forEach(c=>{
-        if (c === it.buyer) return;
-        net[c] = (net[c]||0) - share;
-        net[it.buyer] = (net[it.buyer]||0) + share;
+        if (c === it.buyer) return; // Buyer doesn't owe themselves
+        net[c] = (net[c] || 0) - share; // Customer owes their share to buyer
+        net[it.buyer] = (net[it.buyer] || 0) + share; // Buyer receives customer share
       });
     });
 

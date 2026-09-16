@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.js"></script>
+<style>
+  :root{
+    --paper:#EFEDE3;
+    --paper-raised:#F7F5EC;
+    --ink:#22271F;
+    --ink-soft:#565B4E;
+    --green:#2F4A3D;
+    --green-soft:#5C7A68;
+    --tomato:#B4432A;
+    --gold:#C99A3B;
+    --line:#D7D2C2;
+    --line-soft:#E4E0D3;
+    --white:#FFFFFF;
+    --radius-s:6px;
+    --radius-m:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Public Sans', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--gold); color:var(--ink); }
+
+  .app{
+    max-width:1180px;
+    margin:0 auto;
+    padding:32px 24px 80px;
+  }
+
+  /* ---------- Header ---------- */
+  header.top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:24px;
+    flex-wrap:wrap;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:28px;
+  }
+  header.top h1{
+    font-family:'Fraunces', serif;
+    font-optical-sizing:auto;
+    font-weight:600;
+    font-size:clamp(32px, 4vw, 44px);
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+    color:var(--green);
+  }
+  header.top p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:15px;
+    max-width:46ch;
+  }
+  .roommates{
+    display:flex;
+    gap:8px;
+  }
+  .roommate-chip{
+    font-size:13px;
+    font-weight:600;
+    padding:6px 12px;
+    border-radius:20px;
+    border:1.5px solid var(--ink);
+    background:var(--paper-raised);
+  }
+
+  /* ---------- Layout ---------- */
+  .layout{
+    display:grid;
+    grid-template-columns:1.5fr 1fr;
+    gap:28px;
+    align-items:start;
+  }
+  @media (max-width:880px){
+    .layout{ grid-template-columns:1fr; }
+  }
+
+  .panel{
+    background:var(--paper-raised);
+    border:1.5px solid var(--ink);
+    border-radius:var(--radius-m);
+    padding:22px;
+  }
+  .panel + .panel{ margin-top:24px; }
+  .panel h2{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:20px;
+    margin:0 0 16px;
+    color:var(--ink);
+  }
+
+  /* ---------- Form ---------- */
+  #item-form{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px 12px;
+    margin-bottom:6px;
+  }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field.span2{ grid-column:1 / -1; }
+  .field label{
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+  }
+  .field input[type=text],
+  .field input[type=number],
+  .field input[type=date]{
+    font-family:inherit;
+    font-size:14.5px;
+    padding:9px 10px;
+    border:1.5px solid var(--line);
+    border-radius:var(--radius-s);
+    background:var(--white);
+    color:var(--ink);
+  }
+  .field input:focus{
+    outline:none;
+    border-color:var(--green);
+  }
+
+  .pillrow{ display:flex; flex-wrap:wrap; gap:6px; }
+  .pill{
+    font-size:13px;
+    font-weight:600;
+    padding:6px 11px;
+    border-radius:20px;
+    border:1.5px solid var(--line);
+    background:var(--white);
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  .pill:hover{ border-color:var(--green-soft); }
+  .pill.selected{
+    background:var(--green);
+    border-color:var(--green);
+    color:var(--white);
+  }
+  .pill.selected.tomato{ background:var(--tomato); border-color:var(--tomato); }
+  .dot{
+    display:inline-block;
+    width:8px;height:8px;
+    border-radius:50%;
+    margin-right:6px;
+    vertical-align:middle;
+  }
+
+  .form-actions{
+    display:flex;
+    gap:10px;
+    margin-top:10px;
+    grid-column:1/-1;
+  }
+  button{
+    font-family:inherit;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    border-radius:var(--radius-s);
+    border:1.5px solid var(--ink);
+    padding:10px 18px;
+    background:var(--ink);
+    color:var(--paper-raised);
+  }
+  button.secondary{
+    background:transparent;
+    color:var(--ink);
+  }
+  button:disabled{ opacity:.5; cursor:default; }
+
+  /* ---------- Table ---------- */
+  .table-wrap{ overflow-x:auto; }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13.5px;
+  }
+  thead th{
+    text-align:left;
+    font-size:11.5px;
+    font-weight:700;
+    color:var(--ink-soft);
+    padding:6px 8px;
+    border-bottom:1.5px solid var(--ink);
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:9px 8px;
+    border-bottom:1px solid var(--line-soft);
+    vertical-align:middle;
+    white-space:nowrap;
+  }
+  tbody tr:hover{ background:rgba(0,0,0,0.02); }
+  .tag{
+    font-size:11.5px;
+    font-weight:600;
+    padding:3px 9px;
+    border-radius:20px;
+    background:var(--line-soft);
+    color:var(--ink);
+    white-space:nowrap;
+  }
+  .unclaimed{ color:var(--tomato); font-style:italic; font-size:12px; }
+  .row-actions button{
+    padding:4px 9px;
+    font-size:12px;
+    font-weight:600;
+  }
+  .row-actions{ display:flex; gap:6px; }
+  .empty-state{
+    padding:32px 8px;
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:14px;
+  }
+
+  /* ---------- Period nav ---------- */
+  .period-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .period-toggle{ display:flex; gap:6px; }
+  .period-toggle .pill{ padding:5px 12px; font-size:12.5px; }
+  .period-range{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-weight:600;
+    font-size:13.5px;
+  }
+  .period-range button{
+    padding:4px 9px;
+    font-size:14px;
+    background:transparent;
+    color:var(--ink);
+  }
+
+  /* ---------- Settlement ---------- */
+  .balances{ display:flex; flex-direction:column; gap:10px; margin-bottom:18px; }
+  .balance-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 12px;
+    border-radius:var(--radius-s);
+    border:1.5px solid var(--line);
+    background:var(--white);
+  }
+  .balance-row .name{ font-weight:600; }
+  .balance-row .amt.positive{ color:var(--green); font-weight:700; }
+  .balance-row .amt.negative{ color:var(--tomato); font-weight:700; }
+  .balance-row .amt.zero{ color:var(--ink-soft); font-weight:600; }
+
+  .settle-list{
+    list-style:none;
+    margin:0; padding:0;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .settle-list li{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:12px 14px;
+    border-radius:var(--radius-s);
+    background:var(--white);
+    border:1.5px solid var(--line);
+    font-size:14.5px;
+  }
+  .settle-list .arrow{ color:var(--gold); font-weight:700; }
+  .settle-list .sum{ margin-left:auto; font-weight:700; color:var(--tomato); }
+  .all-settled{
+    text-align:center;
+    padding:22px 10px;
+    color:var(--green);
+    font-weight:600;
+    font-size:14.5px;
+  }
+  .meta-line{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-top:14px;
+    line-height:1.5;
+  }
+  .save-status{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-top:10px;
+    min-height:16px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div>
+      <h1>Grocery Ledger</h1>
+      <p>Log what's bought, who it's for, and let the ledger work out who owes who.</p>
+    </div>
+    <div class="roommates">
+      <span class="roommate-chip">Elix</span>
+      <span class="roommate-chip">Bethany</span>
+      <span class="roommate-chip">Shirley</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- LEFT: log -->
+    <div>
+      <div class="panel">
+        <h2 id="form-title">Add an item</h2>
+        <form id="item-form">
+          <div class="field">
+            <label for="f-name">Item name</label>
+            <input type="text" id="f-name" placeholder="e.g. Bananas" required>
+          </div>
+          <div class="field">
+            <label for="f-qty">Quantity</label>
+            <input type="text" id="f-qty" placeholder="e.g. 2 bunches" required>
+          </div>
+          <div class="field">
+            <label for="f-price">Total price ($)</label>
+            <input type="number" id="f-price" step="0.001" min="0" placeholder="0.00" required>
+          </div>
+          <div class="field">
+            <label for="f-date">Date</label>
+            <input type="date" id="f-date" required>
+          </div>
+
+          <div class="field span2">
+            <label>Category — click, or type below</label>
+            <div class="pillrow" id="cat-pills"></div>
+            <input type="text" id="f-category" list="cat-list" placeholder="Type a category…" style="margin-top:6px;">
+            <datalist id="cat-list"></datalist>
+          </div>
+
+          <div class="field span2">
+            <label>Vendor — click, or type below</label>
+            <div class="pillrow" id="vendor-pills"></div>
+            <input type="text" id="f-vendor" list="vendor-list" placeholder="Type a vendor…" style="margin-top:6px;">
+            <datalist id="vendor-list"></datalist>
+          </div>
+
+          <div class="field span2">
+            <label>Buyer — who paid</label>
+            <div class="pillrow" id="buyer-pills"></div>
+          </div>
+
+          <div class="field span2">
+            <label>Customer(s) — who it's for (split evenly, leave blank if unclaimed)</label>
+            <div class="pillrow" id="customer-pills"></div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="submit-btn">Add item</button>
+            <button type="button" class="secondary" id="cancel-edit" style="display:none;">Cancel edit</button>
+          </div>
+        </form>
+        <div class="save-status" id="save-status">Connecting to live cloud ledger...</div>
+      </div>
+
+      <div class="panel">
+        <h2 style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <span>Item log</span>
+          <span style="display:flex; gap:8px;">
+            <button type="button" class="secondary" id="export-excel-btn" style="font-size:12.5px; padding:7px 12px;">Export Excel</button>
+            <button type="button" class="secondary" id="export-pdf-btn" style="font-size:12.5px; padding:7px 12px;">Export PDF</button>
+          </span>
+        </h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Item</th><th>Qty</th><th>Category</th><th>Vendor</th>
+                <th>Price</th><th>Buyer</th><th>For</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="items-body"></tbody>
+          </table>
+          <div class="empty-state" id="empty-state" style="display:none;">No items logged yet — add your first grocery run above.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: settlement -->
+    <div class="panel" style="position:sticky; top:20px;">
+      <h2>Who owes who</h2>
+      <div class="period-nav">
+        <div class="period-toggle" id="period-toggle">
+          <span class="pill selected" data-period="week">Weekly</span>
+          <span class="pill" data-period="month">Monthly</span>
+        </div>
+      </div>
+      <div class="period-range">
+        <button type="button" id="period-prev">←</button>
+        <span id="period-label"></span>
+        <button type="button" id="period-next">→</button>
+      </div>
+
+      <div class="balances" id="balances"></div>
+      <ul class="settle-list" id="settle-list"></ul>
+
+      <div class="meta-line" id="settle-meta"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { 
+    getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc 
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA9NBSUVvv0Vw6EDzvznWsDnWn6VFZBel4",
+    authDomain: "groceries-5a3e2.firebaseapp.com",
+    projectId: "groceries-5a3e2",
+    storageBucket: "groceries-5a3e2.firebasestorage.app",
+    messagingSenderId: "634412559836",
+    appId: "1:634412559836:web:7ac56a41b74315e21e7319",
+    measurementId: "G-TLMGRYKFNN"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const itemsCollection = collection(db, "grocery_items");
+
+  const CATEGORIES = [
+    {name:'Fruits', color:'#C99A3B'},
+    {name:'Meat', color:'#B4432A'},
+    {name:'Vegetables', color:'#2F4A3D'},
+    {name:'Carbs', color:'#8A6D3B'},
+    {name:'Others', color:'#5C7A9A'}
+  ];
+  const VENDORS = ["Trader Joe's","Costco","Safeway","Whole Foods","Berkeley Bowl","Ranch 99"];
+  const PEOPLE = ["Elix","Bethany","Shirley"];
+
+  let items = [];
+  let editingId = null;
+  let selCategory = "";
+  let selVendor = "";
+  let selBuyer = "";
+  let selCustomers = [];
+  let period = "week";
+  let periodOffset = 0;
+
+  const $ = (id) => document.getElementById(id);
+
+  function initPills(){
+    const catPills = $('cat-pills');
+    CATEGORIES.forEach(c=>{
+      const p = document.createElement('span');
+      p.className = 'pill';
+      p.dataset.value = c.name;
+      p.innerHTML = `<span class="dot" style="background:${c.color}"></span>${c.name}`;
+      p.onclick = () => { setCategory(c.name); };
+      catPills.appendChild(p);
+    });
+    const catList = $('cat-list');
+    CATEGORIES.forEach(c=>{ const o=document.createElement('option'); o.value=c.name; catList.appendChild(o); });
+
+    const vendorPills = $('vendor-pills');
+    VENDORS.forEach(v=>{
+      const p = document.createElement('span');
+      p.className = 'pill';
+      p.dataset.value = v;
+      p.textContent = v;
+      p.onclick = () => { setVendor(v); };
+      vendorPills.appendChild(p);
+    });
+    const vendorList = $('vendor-list');
+    VENDORS.forEach(v=>{ const o=document.createElement('option'); o.value=v; vendorList.appendChild(o); });
+
+    const buyerPills = $('buyer-pills');
+    PEOPLE.forEach(p1=>{
+      const p = document.createElement('span');
+      p.className = 'pill';
+      p.dataset.value = p1;
+      p.textContent = p1;
+      p.onclick = () => { setBuyer(p1); };
+      buyerPills.appendChild(p);
+    });
+
+    const customerPills = $('customer-pills');
+    PEOPLE.forEach(p1=>{
+      const p = document.createElement('span');
+      p.className = 'pill tomato';
+      p.dataset.value = p1;
+      p.textContent = p1;
+      p.onclick = () => { toggleCustomer(p1); };
+      customerPills.appendChild(p);
+    });
+  }
+
+  function setCategory(v){
+    selCategory = v;
+    $('f-category').value = v;
+    document.querySelectorAll('#cat-pills .pill').forEach(p=>{
+      p.classList.toggle('selected', p.dataset.value === v);
+    });
+  }
+  function setVendor(v){
+    selVendor = v;
+    $('f-vendor').value = v;
+    document.querySelectorAll('#vendor-pills .pill').forEach(p=>{
+      p.classList.toggle('selected', p.dataset.value === v);
+    });
+  }
+  function setBuyer(v){
+    selBuyer = v;
+    document.querySelectorAll('#buyer-pills .pill').forEach(p=>{
+      p.classList.toggle('selected', p.dataset.value === v);
+    });
+  }
+  function toggleCustomer(v){
+    const idx = selCustomers.indexOf(v);
+    if (idx === -1) selCustomers.push(v); else selCustomers.splice(idx,1);
+    document.querySelectorAll('#customer-pills .pill').forEach(p=>{
+      p.classList.toggle('selected', selCustomers.includes(p.dataset.value));
+    });
+  }
+
+  $('f-category').addEventListener('input', (e)=> setCategory(e.target.value));
+  $('f-vendor').addEventListener('input', (e)=> setVendor(e.target.value));
+
+  // ---------- Firestore Real-Time Listener ----------
+  onSnapshot(itemsCollection, (snapshot) => {
+    items = [];
+    snapshot.forEach((doc) => {
+      items.push({ id: doc.id, ...doc.data() });
+    });
+    $('save-status').textContent = 'Synced with cloud ledger';
+    setTimeout(() => { $('save-status').textContent = ''; }, 2000);
+    render();
+  }, (error) => {
+    $('save-status').textContent = '⚠ Cloud sync error: Check setup';
+    console.error(error);
+  });
+
+  // ---------- Form ----------
+  $('f-date').value = new Date().toISOString().slice(0,10);
+
+  $('item-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const name = $('f-name').value.trim();
+    const qty = $('f-qty').value.trim();
+    const price = parseFloat($('f-price').value);
+    const date = $('f-date').value;
+    const category = $('f-category').value.trim() || selCategory;
+    const vendor = $('f-vendor').value.trim() || selVendor;
+
+    if (!name || !qty || isNaN(price) || !date){ return; }
+    if (!selBuyer){ alert("Please select who bought this item."); return; }
+
+    const itemData = {
+      name, qty, price, date, category, vendor,
+      buyer: selBuyer, customers: [...selCustomers]
+    };
+
+    $('save-status').textContent = 'Saving to cloud...';
+
+    try {
+      if (editingId){
+        await updateDoc(doc(db, "grocery_items", editingId), itemData);
+        editingId = null;
+        $('form-title').textContent = 'Add an item';
+        $('submit-btn').textContent = 'Add item';
+        $('cancel-edit').style.display = 'none';
+      } else {
+        await addDoc(itemsCollection, itemData);
+      }
+      resetForm();
+    } catch (err) {
+      alert("Error saving item: " + err.message);
+    }
+  });
+
+  $('cancel-edit').addEventListener('click', ()=>{
+    editingId = null;
+    $('form-title').textContent = 'Add an item';
+    $('submit-btn').textContent = 'Add item';
+    $('cancel-edit').style.display = 'none';
+    resetForm();
+  });
+
+  function resetForm(){
+    $('item-form').reset();
+    $('f-date').value = new Date().toISOString().slice(0,10);
+    selCategory = ""; selVendor = ""; selBuyer = ""; selCustomers = [];
+    document.querySelectorAll('.pill').forEach(p=>p.classList.remove('selected'));
+  }
+
+  function startEdit(id){
+    const it = items.find(i=>i.id===id);
+    if (!it) return;
+    editingId = id;
+    $('f-name').value = it.name;
+    $('f-qty').value = it.qty;
+    $('f-price').value = it.price;
+    $('f-date').value = it.date;
+    setCategory(it.category);
+    setVendor(it.vendor);
+    setBuyer(it.buyer);
+    selCustomers = [...it.customers];
+    document.querySelectorAll('#customer-pills .pill').forEach(p=>{
+      p.classList.toggle('selected', selCustomers.includes(p.dataset.value));
+    });
+    $('form-title').textContent = 'Edit item';
+    $('submit-btn').textContent = 'Save changes';
+    $('cancel-edit').style.display = 'inline-block';
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  async function deleteItem(id){
+    if (confirm("Are you sure you want to delete this item?")) {
+      $('save-status').textContent = 'Deleting from cloud...';
+      await deleteDoc(doc(db, "grocery_items", id));
+      if (editingId===id){ editingId=null; resetForm(); $('form-title').textContent='Add an item'; $('submit-btn').textContent='Add item'; $('cancel-edit').style.display='none'; }
+    }
+  }
+  window.__deleteItem = deleteItem;
+  window.__startEdit = startEdit;
+
+  // ---------- Table render ----------
+  function categoryColor(name){
+    const c = CATEGORIES.find(c=>c.name.toLowerCase()===String(name).toLowerCase());
+    return c ? c.color : '#8a8a7c';
+  }
+
+  function render(){
+    const body = $('items-body');
+    body.innerHTML = '';
+    const sorted = [...items].sort((a,b)=> b.date.localeCompare(a.date));
+    $('empty-state').style.display = sorted.length ? 'none' : 'block';
+    sorted.forEach(it=>{
+      const tr = document.createElement('tr');
+      const custText = it.customers && it.customers.length
+        ? it.customers.join(', ')
+        : '<span class="unclaimed">unclaimed</span>';
+      tr.innerHTML = `
+        <td>${it.date}</td>
+        <td>${escapeHtml(it.name)}</td>
+        <td>${escapeHtml(it.qty)}</td>
+        <td><span class="tag"><span class="dot" style="background:${categoryColor(it.category)}"></span>${escapeHtml(it.category||'—')}</span></td>
+        <td>${escapeHtml(it.vendor||'—')}</td>
+        <td>$${Number(it.price).toFixed(3)}</td>
+        <td>${escapeHtml(it.buyer||'—')}</td>
+        <td>${custText}</td>
+        <td class="row-actions">
+          <button type="button" class="secondary" onclick="window.__startEdit('${it.id}')">Edit</button>
+          <button type="button" class="secondary" onclick="window.__deleteItem('${it.id}')">Delete</button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+    renderSettlement();
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  // ---------- Period logic ----------
+  function getPeriodRange(){
+    const today = new Date();
+    if (period === 'week'){
+      const d = new Date(today);
+      const day = (d.getDay() + 6) % 7;
+      d.setHours(0,0,0,0);
+      d.setDate(d.getDate() - day + periodOffset*7);
+      const start = new Date(d);
+      const end = new Date(d);
+      end.setDate(end.getDate()+6);
+      return {start, end};
+    } else {
+      const d = new Date(today.getFullYear(), today.getMonth() + periodOffset, 1);
+      const start = new Date(d.getFullYear(), d.getMonth(), 1);
+      const end = new Date(d.getFullYear(), d.getMonth()+1, 0);
+      return {start, end};
+    }
+  }
+  function fmt(d){ return d.toISOString().slice(0,10); }
+  function fmtLabel(d){ return d.toLocaleDateString(undefined,{month:'short', day:'numeric'}); }
+
+  function updatePeriodLabel(){
+    const {start,end} = getPeriodRange();
+    if (period === 'week'){
+      $('period-label').textContent = `${fmtLabel(start)} – ${fmtLabel(end)}`;
+    } else {
+      $('period-label').textContent = start.toLocaleDateString(undefined,{month:'long', year:'numeric'});
+    }
+  }
+
+  $('period-toggle').addEventListener('click', (e)=>{
+    const t = e.target.closest('.pill');
+    if (!t) return;
+    period = t.dataset.period;
+    periodOffset = 0;
+    document.querySelectorAll('#period-toggle .pill').forEach(p=>p.classList.toggle('selected', p===t));
+    updatePeriodLabel();
+    renderSettlement();
+  });
+  $('period-prev').addEventListener('click', ()=>{ periodOffset--; updatePeriodLabel(); renderSettlement(); });
+  $('period-next').addEventListener('click', ()=>{ periodOffset++; updatePeriodLabel(); renderSettlement(); });
+
+  // ---------- Settlement calc ----------
+  function renderSettlement(){
+    const {start, end} = getPeriodRange();
+    const startStr = fmt(start), endStr = fmt(end);
+    const inPeriod = items.filter(it => it.date >= startStr && it.date <= endStr);
+    const claimed = inPeriod.filter(it => it.customers && it.customers.length > 0 && it.buyer);
+
+    const net = {}; PEOPLE.forEach(p=>net[p]=0);
+
+    claimed.forEach(it=>{
+      const share = Number(it.price) / it.customers.length;
+      it.customers.forEach(c=>{
+        if (c === it.buyer) return;
+        net[c] = (net[c]||0) - share;
+        net[it.buyer] = (net[it.buyer]||0) + share;
+      });
+    });
+
+    const balancesEl = $('balances');
+    balancesEl.innerHTML = '';
+    PEOPLE.forEach(p=>{
+      const val = net[p]||0;
+      const cls = val > 0.0005 ? 'positive' : (val < -0.0005 ? 'negative' : 'zero');
+      const label = val > 0.0005 ? `is owed $${val.toFixed(3)}` : (val < -0.0005 ? `owes $${Math.abs(val).toFixed(3)}` : 'settled up');
+      const row = document.createElement('div');
+      row.className = 'balance-row';
+      row.innerHTML = `<span class="name">${p}</span><span class="amt ${cls}">${label}</span>`;
+      balancesEl.appendChild(row);
+    });
+
+    const debtors = PEOPLE.filter(p=>net[p] < -0.0005).map(p=>({p, amt:-net[p]})).sort((a,b)=>b.amt-a.amt);
+    const creditors = PEOPLE.filter(p=>net[p] > 0.0005).map(p=>({p, amt:net[p]})).sort((a,b)=>b.amt-a.amt);
+    const transactions = [];
+    let di=0, ci=0;
+    while(di < debtors.length && ci < creditors.length){
+      const d = debtors[di], c = creditors[ci];
+      const amt = Math.min(d.amt, c.amt);
+      transactions.push({from:d.p, to:c.p, amt});
+      d.amt -= amt; c.amt -= amt;
+      if (d.amt <= 0.0005) di++;
+      if (c.amt <= 0.0005) ci++;
+    }
+
+    const listEl = $('settle-list');
+    listEl.innerHTML = '';
+    if (!transactions.length){
+      listEl.innerHTML = `<div class="all-settled">Everyone's settled up for this period.</div>`;
+    } else {
+      transactions.forEach(t=>{
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${t.from}</span><span class="arrow">→</span><span>${t.to}</span><span class="sum">$${t.amt.toFixed(3)}</span>`;
+        listEl.appendChild(li);
+      });
+    }
+
+    const unclaimedCount = inPeriod.length - claimed.length;
+    $('settle-meta').textContent = `${inPeriod.length} item${inPeriod.length===1?'':'s'} logged this period`
+      + (unclaimedCount ? `, ${unclaimedCount} unclaimed and excluded.` : '.');
+  }
+
+  // ---------- Export ----------
+  function buildLogRows(){
+    const sorted = [...items].sort((a,b)=> a.date.localeCompare(b.date));
+    return sorted.map(it => ({
+      Date: it.date,
+      Item: it.name,
+      Quantity: it.qty,
+      Category: it.category || '',
+      Vendor: it.vendor || '',
+      'Price ($)': Number(Number(it.price).toFixed(3)),
+      Buyer: it.buyer || '',
+      Customers: (it.customers && it.customers.length) ? it.customers.join(', ') : 'unclaimed'
+    }));
+  }
+
+  function currentSettlementSummary(){
+    const {start, end} = getPeriodRange();
+    const startStr = fmt(start), endStr = fmt(end);
+    const inPeriod = items.filter(it => it.date >= startStr && it.date <= endStr);
+    const claimed = inPeriod.filter(it => it.customers && it.customers.length > 0 && it.buyer);
+    const net = {}; PEOPLE.forEach(p=>net[p]=0);
+    claimed.forEach(it=>{
+      const share = Number(it.price) / it.customers.length;
+      it.customers.forEach(c=>{
+        if (c === it.buyer) return;
+        net[c] -= share;
+        net[it.buyer] += share;
+      });
+    });
+    const debtors = PEOPLE.filter(p=>net[p] < -0.0005).map(p=>({p, amt:-net[p]})).sort((a,b)=>b.amt-a.amt);
+    const creditors = PEOPLE.filter(p=>net[p] > 0.0005).map(p=>({p, amt:net[p]})).sort((a,b)=>b.amt-a.amt);
+    const transactions = [];
+    let di=0, ci=0;
+    while(di < debtors.length && ci < creditors.length){
+      const d = debtors[di], c = creditors[ci];
+      const amt = Math.min(d.amt, c.amt);
+      transactions.push({from:d.p, to:c.p, amt});
+      d.amt -= amt; c.amt -= amt;
+      if (d.amt <= 0.0005) di++;
+      if (c.amt <= 0.0005) ci++;
+    }
+    return { label: $('period-label').textContent, transactions };
+  }
+
+  $('export-excel-btn').addEventListener('click', ()=>{
+    if (!items.length){ alert('No items to export yet.'); return; }
+    const rows = buildLogRows();
+    const wb = XLSX.utils.book_new();
+    const logSheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, logSheet, 'Item Log');
+
+    const summary = currentSettlementSummary();
+    const summaryRows = summary.transactions.length
+      ? summary.transactions.map(t => ({ From: t.from, To: t.to, 'Amount ($)': Number(t.amt.toFixed(3)) }))
+      : [{ From: '—', To: '—', 'Amount ($)': 0 }];
+    const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
+    XLSX.utils.book_append_sheet(wb, summarySheet, `Settlement (${summary.label})`);
+
+    XLSX.writeFile(wb, 'grocery-ledger.xlsx');
+  });
+
+  $('export-pdf-btn').addEventListener('click', ()=>{
+    if (!items.length){ alert('No items to export yet.'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'landscape' });
+    const rows = buildLogRows();
+
+    doc.setFontSize(16);
+    doc.text('Grocery Ledger', 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Exported ${new Date().toLocaleDateString()}`, 14, 22);
+
+    doc.autoTable({
+      startY: 28,
+      head: [['Date','Item','Qty','Category','Vendor','Price ($)','Buyer','Customers']],
+      body: rows.map(r => [r.Date, r.Item, r.Quantity, r.Category, r.Vendor, r['Price ($)'].toFixed(3), r.Buyer, r.Customers]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [47,74,61] }
+    });
+
+    const summary = currentSettlementSummary();
+    let y = doc.lastAutoTable.finalY + 12;
+    doc.setFontSize(13);
+    doc.text(`Settlement — ${summary.label}`, 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    if (!summary.transactions.length){
+      doc.text('Everyone is settled up for this period.', 14, y);
+    } else {
+      summary.transactions.forEach(t=>{
+        doc.text(`${t.from} owes ${t.to}: $${t.amt.toFixed(3)}`, 14, y);
+        y += 6;
+      });
+    }
+
+    doc.save('grocery-ledger.pdf');
+  });
+
+  // ---------- Boot ----------
+  initPills();
+  updatePeriodLabel();
+</script>
+</body>
+</html>

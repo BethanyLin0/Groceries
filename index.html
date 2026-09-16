@@ -757,18 +757,35 @@
       balancesEl.appendChild(row);
     });
 
-    const debtors = PEOPLE.filter(p=>net[p] < -0.0005).map(p=>({p, amt:-net[p]})).sort((a,b)=>b.amt-a.amt);
-    const creditors = PEOPLE.filter(p=>net[p] > 0.0005).map(p=>({p, amt:net[p]})).sort((a,b)=>b.amt-a.amt);
+    // Pairwise Net Settlement calculation
+    const pairwise = {};
+    PEOPLE.forEach(p => {
+      pairwise[p] = {};
+      PEOPLE.forEach(q => { pairwise[p][q] = 0; });
+    });
+
+    claimed.forEach(it => {
+      const share = Number(it.price) / it.customers.length;
+      it.customers.forEach(c => {
+        if (c === it.buyer) return;
+        pairwise[c][it.buyer] = (pairwise[c][it.buyer] || 0) + share;
+      });
+    });
+
     const transactions = [];
-    let di=0, ci=0;
-    while(di < debtors.length && ci < creditors.length){
-      const d = debtors[di], c = creditors[ci];
-      const amt = Math.min(d.amt, c.amt);
-      transactions.push({from:d.p, to:c.p, amt});
-      d.amt -= amt; c.amt -= amt;
-      if (d.amt <= 0.0005) di++;
-      if (c.amt <= 0.0005) ci++;
-    }
+    PEOPLE.forEach(p1 => {
+      PEOPLE.forEach(p2 => {
+        if (p1 >= p2) return;
+        const p1OwesP2 = pairwise[p1][p2] || 0;
+        const p2OwesP1 = pairwise[p2][p1] || 0;
+        const diff = p1OwesP2 - p2OwesP1;
+        if (diff > 0.0005) {
+          transactions.push({from: p1, to: p2, amt: diff});
+        } else if (diff < -0.0005) {
+          transactions.push({from: p2, to: p1, amt: -diff});
+        }
+      });
+    });
 
     const listEl = $('settle-list');
     listEl.innerHTML = '';
@@ -807,27 +824,36 @@
     const startStr = fmt(start), endStr = fmt(end);
     const inPeriod = items.filter(it => it.date >= startStr && it.date <= endStr);
     const claimed = inPeriod.filter(it => it.customers && it.customers.length > 0 && it.buyer);
-    const net = {}; PEOPLE.forEach(p=>net[p]=0);
-    claimed.forEach(it=>{
+    
+    const pairwise = {};
+    PEOPLE.forEach(p => {
+      pairwise[p] = {};
+      PEOPLE.forEach(q => { pairwise[p][q] = 0; });
+    });
+
+    claimed.forEach(it => {
       const share = Number(it.price) / it.customers.length;
-      it.customers.forEach(c=>{
+      it.customers.forEach(c => {
         if (c === it.buyer) return;
-        net[c] -= share;
-        net[it.buyer] += share;
+        pairwise[c][it.buyer] = (pairwise[c][it.buyer] || 0) + share;
       });
     });
-    const debtors = PEOPLE.filter(p=>net[p] < -0.0005).map(p=>({p, amt:-net[p]})).sort((a,b)=>b.amt-a.amt);
-    const creditors = PEOPLE.filter(p=>net[p] > 0.0005).map(p=>({p, amt:net[p]})).sort((a,b)=>b.amt-a.amt);
+
     const transactions = [];
-    let di=0, ci=0;
-    while(di < debtors.length && ci < creditors.length){
-      const d = debtors[di], c = creditors[ci];
-      const amt = Math.min(d.amt, c.amt);
-      transactions.push({from:d.p, to:c.p, amt});
-      d.amt -= amt; c.amt -= amt;
-      if (d.amt <= 0.0005) di++;
-      if (c.amt <= 0.0005) ci++;
-    }
+    PEOPLE.forEach(p1 => {
+      PEOPLE.forEach(p2 => {
+        if (p1 >= p2) return;
+        const p1OwesP2 = pairwise[p1][p2] || 0;
+        const p2OwesP1 = pairwise[p2][p1] || 0;
+        const diff = p1OwesP2 - p2OwesP1;
+        if (diff > 0.0005) {
+          transactions.push({from: p1, to: p2, amt: diff});
+        } else if (diff < -0.0005) {
+          transactions.push({from: p2, to: p1, amt: -diff});
+        }
+      });
+    });
+
     return { label: $('period-label').textContent, transactions };
   }
 
